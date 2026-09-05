@@ -8,10 +8,7 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
-    <!-- Required alongside FOREGROUND_SERVICE_PHONE_CALL for a
-         foregroundServiceType="phoneCall" service on targetSdk 34+ -->
-    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Needed so the SIP UDP registration can be kept alive with minimal throttling -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -43,11 +40,23 @@
         <!-- Foreground service keeps the UDP SIP registration alive while the
              app is backgrounded. UDP has no server-push mechanism like
              TCP/TLS providers often support, so this service is mandatory
-             for reliably receiving incoming calls. -->
+             for reliably receiving incoming calls.
+
+             specialUse (not phoneCall) is used deliberately: phoneCall type
+             is meant for apps integrated with Android's Telecom/
+             ConnectionService framework, which this app doesn't use. Calling
+             it that without the integration is a policy mismatch that can
+             get the service killed by the OS. specialUse is the documented
+             fit for "keep a background network connection alive" work that
+             doesn't match a standard category. -->
         <service
             android:name=".SipCallService"
             android:exported="false"
-            android:foregroundServiceType="phoneCall" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="voip-sip-registration-keepalive" />
+        </service>
 
     </application>
 </manifest>

@@ -36,7 +36,7 @@ class SipCallService : Service() {
 
     private fun buildNotification(text: String): Notification {
         return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("SipCaller")
+            .setContentTitle("XLine")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.sym_call_incoming)
             .setOngoing(true)
