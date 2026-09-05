@@ -17,6 +17,14 @@ object SipManager {
 
     private var endpoint: Endpoint? = null
     private var account: SipAccount? = null
+    private var isRegistered = false
+
+    fun isAccountRegistered(): Boolean = isRegistered
+
+    /** Called by SipAccount.onRegState — not meant to be called from UI code. */
+    fun setRegistered(registered: Boolean) {
+        isRegistered = registered
+    }
 
     data class SipCredentials(
         val username: String,     // SIP extension / auth username
@@ -65,6 +73,7 @@ object SipManager {
     }
 
     fun registerAccount(creds: SipCredentials) {
+        isRegistered = false
         try {
             account?.delete()
 
@@ -77,7 +86,8 @@ object SipManager {
 
             val cred = AuthCredInfo(
                 "digest",
-                creds.domain,
+                "*", // wildcard realm — matches whatever realm the server challenges with,
+                     // which often isn't the same string as the SIP domain
                 creds.username,
                 0,
                 creds.password
@@ -101,7 +111,11 @@ object SipManager {
 
     fun makeCall(destinationNumber: String): SipCall? {
         val acc = account ?: run {
-            Log.e(TAG, "No account registered yet")
+            Log.e(TAG, "No account created yet")
+            return null
+        }
+        if (!isRegistered) {
+            Log.e(TAG, "Refusing to call: account is not registered")
             return null
         }
         return try {

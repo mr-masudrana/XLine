@@ -23,7 +23,7 @@ class SipCallService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("SIP account connected"))
+        startForeground(NOTIFICATION_ID, buildNotification("Keeping SIP connection alive"))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

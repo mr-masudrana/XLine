@@ -14,6 +14,7 @@ class SipAccount(private val cfg: AccountConfig) : Account() {
         val code = prm.code
         val isOk = code in 200..299
         Log.i(TAG, "Registration state: $code ${prm.reason}")
+        SipManager.setRegistered(isOk)
         SipManager.callListener?.onRegistrationStateChanged(isOk, "$code ${prm.reason}")
     }
 

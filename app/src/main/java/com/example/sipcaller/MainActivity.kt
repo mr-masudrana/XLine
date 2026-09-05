@@ -80,6 +80,10 @@ class MainActivity : AppCompatActivity(), SipManager.SipCallListener {
             Toast.makeText(this, "নম্বর দিন", Toast.LENGTH_SHORT).show()
             return
         }
+        if (!SipManager.isAccountRegistered()) {
+            Toast.makeText(this, "Account registered নেই — আগে Register করুন", Toast.LENGTH_SHORT).show()
+            return
+        }
         val call = SipManager.makeCall(destination)
         if (call != null) {
             val intent = Intent(this, CallActivity::class.java)
