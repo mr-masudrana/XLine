@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.example.sipcaller'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.sipcaller"
+        minSdk 23
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        // Only the ABIs you actually need — reduces APK size.
+        // Must match whatever ABIs your PJSIP .so/.aar was built for.
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // --- PJSIP / pjsua2 ---
+    // OPTION A (quick start): community precompiled AAR with UDP/TCP/TLS support.
+    // Verify this is still published/maintained before relying on it in production.
+    implementation 'com.pjdroid:pjdroid:2.2.4'
+
+    // OPTION B (recommended long-term): build PJSIP from source yourself
+    // (https://trac.pjsip.org/repos/wiki/Getting-Started/Android), drop the
+    // resulting pjsua2.aar into app/libs/, remove Option A above, and use:
+    // implementation files('libs/pjsua2.aar')
+}

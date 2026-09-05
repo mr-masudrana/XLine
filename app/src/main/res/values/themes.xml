@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.SipCaller" parent="Theme.MaterialComponents.DayNight.NoActionBar" />
+</resources>
