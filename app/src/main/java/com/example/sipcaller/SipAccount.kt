@@ -10,12 +10,8 @@ class SipAccount(private val cfg: AccountConfig) : Account() {
     // Domain kept around so SipManager can build "sip:number@domain" URIs
     val accCfgDomain: String = cfg.idUri.substringAfter("@").substringBefore(":")
 
-    fun create(config: AccountConfig) {
-        super.create(config)
-    }
-
     override fun onRegState(prm: OnRegStateParam) {
-        val code = prm.code.swigValue()
+        val code = prm.code
         val isOk = code in 200..299
         Log.i(TAG, "Registration state: $code ${prm.reason}")
         SipManager.callListener?.onRegistrationStateChanged(isOk, "$code ${prm.reason}")
