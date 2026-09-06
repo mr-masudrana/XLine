@@ -9,7 +9,7 @@ class SipAccount(private val cfg: AccountConfig, val accCfgDomain: String, val a
 
     override fun onRegState(prm: OnRegStateParam) {
         synchronized(SipManager.nativeLock) {
-        val code = prm.code
+        val code = prm.code.swigValue()
         val isOk = code in 200..299
         Log.i(TAG, "Registration state: $code ${prm.reason}")
         SipManager.dispatchRegistration(isOk, "$code ${prm.reason}")

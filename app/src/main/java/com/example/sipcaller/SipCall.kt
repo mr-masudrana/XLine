@@ -79,7 +79,7 @@ class SipCall : Call {
                 val ci = info
                 remoteUri = ci.remoteUri
                 lastState = mapState(ci.state)
-                lastStatusCode = try { ci.lastStatusCode.toInt() } catch (_: Throwable) { 0 }
+                lastStatusCode = try { ci.lastStatusCode.swigValue() } catch (_: Throwable) { 0 }
                 lastReason = ci.lastReason ?: ""
 
                 if (lastState == STATE_CONFIRMED && connectedAt == 0L) {
