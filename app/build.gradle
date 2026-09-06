@@ -1,30 +1,75 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
+    id 'com.google.devtools.ksp'
+    id 'com.google.gms.google-services'
+    id 'com.google.firebase.crashlytics'
 }
 
 android {
-    namespace 'com.example.sipcaller'
-    compileSdk 34
-
+    namespace 'com.ipdial'
+    compileSdk 37
     defaultConfig {
-        applicationId "com.example.sipcaller"
-        minSdk 23
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        applicationId "com.ipdial"
+        minSdk 26
+        targetSdk 35
+        versionCode 25
+        versionName "1.1.5"
 
-        // Only the ABIs you actually need — reduces APK size.
-        // Must match whatever ABIs your PJSIP .so/.aar was built for.
-        ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary true
+        }
+        resConfigs "en"
+    }
+
+    // ABI splits to keep APK small — users get only the native lib for their CPU
+    splits {
+        abi {
+            enable true
+            reset()
+            include "arm64-v8a", "armeabi-v7a"
+            universalApk true
+        }
+    }
+
+    def keystorePropertiesFile = rootProject.file("keystore.properties")
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    }
+
+    signingConfigs {
+        release {
+            // CI: use env vars from GitHub Secrets; local: fall back to keystore.properties
+            def storeFileEnv = System.getenv("STORE_FILE")
+            def storePasswordEnv = System.getenv("STORE_PASSWORD")
+            def keyAliasEnv = System.getenv("KEY_ALIAS")
+            def keyPasswordEnv = System.getenv("KEY_PASSWORD")
+            if (storeFileEnv != null) {
+                storeFile file(storeFileEnv)
+                storePassword storePasswordEnv
+                keyAlias keyAliasEnv
+                keyPassword keyPasswordEnv
+            } else if (keystoreProperties.containsKey('STORE_FILE')) {
+                storeFile file(keystoreProperties['STORE_FILE'])
+                storePassword keystoreProperties['STORE_PASSWORD']
+                keyAlias keystoreProperties['KEY_ALIAS']
+                keyPassword keystoreProperties['KEY_PASSWORD']
+            }
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            debuggable true
         }
     }
 
@@ -33,24 +78,98 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = '17'
+    buildFeatures {
+        compose true
+        buildConfig true
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
+    packaging {
+        resources {
+            excludes += [
+                '/META-INF/{AL2.0,LGPL2.1}',
+                '/META-INF/DEPENDENCIES',
+                '/META-INF/LICENSE',
+                '/META-INF/LICENSE.txt',
+                '/META-INF/license.txt',
+                '/META-INF/NOTICE',
+                '/META-INF/NOTICE.txt',
+                '/META-INF/notice.txt',
+                '/META-INF/ASL2.0',
+                '/META-INF/*.kotlin_module'
+            ]
+        }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.addAll([
+            "-opt-in=androidx.compose.ui.ExperimentalComposeUiApi"
+        ])
     }
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    // Firebase
+    implementation platform('com.google.firebase:firebase-bom:34.17.0')
+    implementation 'com.google.firebase:firebase-crashlytics'
+    implementation 'com.google.firebase:firebase-analytics'
+    // Firestore for points sync
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-config'
+    // Firebase Auth + Google Sign-In (Credential Manager)
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'androidx.credentials:credentials:1.3.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.3.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
 
-    // --- PJSIP / pjsua2 ---
-    // OPTION A (quick start): community precompiled AAR with UDP/TCP/TLS support.
-    // Verify this is still published/maintained before relying on it in production.
-    implementation 'com.pjdroid:pjdroid:2.2.4'
+    // Compose BOM
+    implementation platform('androidx.compose:compose-bom:2026.06.00')
 
-    // OPTION B (recommended long-term): build PJSIP from source yourself
-    // (https://trac.pjsip.org/repos/wiki/Getting-Started/Android), drop the
-    // resulting pjsua2.aar into app/libs/, remove Option A above, and use:
-    // implementation files('libs/pjsua2.aar')
+    implementation 'androidx.core:core-ktx:1.19.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.11.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0'
+    implementation 'androidx.activity:activity-compose:1.13.0'
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'androidx.navigation:navigation-compose:2.9.8'
+
+    // DataStore for persisting SIP accounts & settings
+    implementation 'androidx.datastore:datastore-preferences:1.2.1'
+
+    // PJSIP 2.5.0 pjsua2 — SWIG-generated Java bindings, built locally from pjproject 2.5
+    // (with the Android JNI audio driver enabled for the mic-capture-on-emulator fix).
+    // Native libs live in app/src/main/jniLibs/<abi>/libpjsua2.so.
+    implementation files('libs/pjsua2-classes.jar')
+
+    // Coil for image loading
+    implementation "io.coil-kt:coil-compose:2.7.0"
+
+    // Gson for account serialization
+    implementation 'com.google.code.gson:gson:2.14.0'
+
+    // Room
+    implementation "androidx.room:room-runtime:2.8.4"
+    implementation "androidx.room:room-ktx:2.8.4"
+    ksp "androidx.room:room-compiler:2.8.4"
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+
+    // Start.io SDK
+    implementation 'com.startapp:inapp-sdk:5.3.1'
+
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }
