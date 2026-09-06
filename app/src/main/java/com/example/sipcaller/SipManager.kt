@@ -56,12 +56,29 @@ object SipManager {
 
     fun restoreAndRegister(context: android.content.Context): Boolean = SipPreferences(context).load()?.let { registerAccount(it) } ?: false
     fun makeCall(destination: String): SipCall? {
-        val acc = account ?: return null; if (!isRegistered) return null
+        val acc = account ?: return null
+        if (!isRegistered) {
+            Log.w(TAG, "makeCall rejected: account is not registered")
+            return null
+        }
         return try {
-            val target = destination.removePrefix("sip:").trim()
-            val uri = if (target.contains("@")) "sip:$target" else "sip:$target@${acc.accCfgDomain}:${acc.accCfgPort}"
-            SipCall(acc).also { call -> activeCall = call; call.makeCall(uri, CallOpParam(true)) }
-        } catch (e: Exception) { Log.e(TAG, "makeCall failed", e); null }
+            // Phone contacts often contain spaces, dashes and parentheses. They are not valid SIP URI characters.
+            val target = destination.removePrefix("sip:").trim().replace(Regex("[\\s()\\-]"), "")
+            val uri = if (target.contains("@")) {
+                "sip:$target"
+            } else {
+                "sip:$target@${acc.accCfgDomain}:${acc.accCfgPort}"
+            }
+            Log.i(TAG, "Starting SIP INVITE to $uri")
+            val prm = CallOpParam(true)
+            SipCall(acc).also { call ->
+                activeCall = call
+                call.makeCall(uri, prm)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "makeCall failed for $destination", e)
+            null
+        }
     }
     fun clearActiveCall(call: SipCall? = null) { if (call == null || activeCall === call) activeCall = null }
     @Synchronized fun shutdown() { try { activeCall?.delete(); activeCall = null; account?.delete(); account = null; endpoint?.libDestroy(); endpoint?.delete() } catch (e: Exception) { Log.e(TAG, "shutdown", e) } finally { endpoint = null; isRegistered = false } }

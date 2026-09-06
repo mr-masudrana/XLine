@@ -3,13 +3,14 @@ package com.example.sipcaller
 import android.content.Context
 import android.media.AudioManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 
 class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
-
     private var call: SipCall? = null
     private lateinit var audioManager: AudioManager
     private var isMuted = false
@@ -17,6 +18,8 @@ class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
     private var isIncomingCall = false
     private var historySaved = false
     private var remoteNumber = ""
+    private var wasConnected = false
+    private var finishScheduled = false
 
     private lateinit var statusBadge: TextView
     private lateinit var muteButton: ImageButton
@@ -30,8 +33,7 @@ class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
         val remoteUri = intent.getStringExtra(EXTRA_REMOTE) ?: ""
         isIncomingCall = intent.getBooleanExtra(EXTRA_INCOMING, false)
         remoteNumber = remoteUri.substringBefore("@").removePrefix("sip:")
-
-        call = pendingCall
+        call = pendingCall ?: SipManager.currentCall()
         pendingCall = null
 
         val avatarInitial = findViewById<TextView>(R.id.avatarInitial)
@@ -52,49 +54,65 @@ class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
         avatarInitial.text = displayName.firstOrNull()?.uppercase() ?: "?"
 
         incomingRow.visibility = if (isIncomingCall) android.view.View.VISIBLE else android.view.View.GONE
-        // Important: don't show fake Ringing. Actual PJSIP EARLY state will update this.
         statusBadge.text = if (isIncomingCall) "Incoming call" else "Calling…"
 
-        answerBtn.setOnClickListener {
-            call?.answer()
-            incomingRow.visibility = android.view.View.GONE
-            statusBadge.text = "Connecting…"
-        }
-        declineBtn.setOnClickListener { call?.decline(); saveHistory("Declined") }
-        hangupBtn.setOnClickListener { call?.hangupCall(); saveHistory("Ended") }
+        answerBtn.setOnClickListener { call?.answer(); incomingRow.visibility = android.view.View.GONE; statusBadge.text = "Connecting…" }
+        declineBtn.setOnClickListener { call?.decline() }
+        hangupBtn.setOnClickListener { call?.hangupCall(); statusBadge.text = "Ending…" }
         muteButton.setOnClickListener { toggleMute() }
         speakerButton.setOnClickListener { toggleSpeaker() }
 
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         SipManager.addListener(this)
+        call?.let { syncState(it) }
     }
 
     private fun toggleMute() { isMuted = !isMuted; audioManager.isMicrophoneMute = isMuted; muteButton.isSelected = isMuted }
     @Suppress("DEPRECATION") private fun toggleSpeaker() { isSpeakerOn = !isSpeakerOn; audioManager.isSpeakerphoneOn = isSpeakerOn; speakerButton.isSelected = isSpeakerOn }
     @Suppress("DEPRECATION") private fun restoreAudioRouting() { audioManager.isSpeakerphoneOn = false; audioManager.isMicrophoneMute = false; audioManager.mode = AudioManager.MODE_NORMAL }
 
-    override fun onCallStateChanged(call: SipCall, state: String) {
+    private fun syncState(sipCall: SipCall) {
+        if (sipCall.lastState.isNotBlank()) onCallStateChanged(sipCall, sipCall.lastState)
+    }
+
+    override fun onCallStateChanged(sipCall: SipCall, state: String) {
         runOnUiThread {
-            // PJSIP stateText is the source of truth: CALLING -> EARLY (ringing) -> CONFIRMED.
+            val disconnected = state.contains("DISCONN", true)
+            val failedCode = sipCall.lastStatusCode >= 300
             statusBadge.text = when {
                 state.contains("EARLY", true) -> "Ringing…"
                 state.contains("CALLING", true) -> "Calling…"
-                state.contains("CONFIRMED", true) -> "Connected"
-                state.contains("DISCONNECTED", true) -> "Call ended"
+                state.contains("CONFIRMED", true) -> { wasConnected = true; "Connected" }
+                disconnected && failedCode -> "Failed: ${sipCall.lastStatusCode}"
+                disconnected && wasConnected -> "Call ended"
+                disconnected -> "Call ended"
                 else -> state
             }
-            if (state.contains("DISCONNECTED", true)) {
-                saveHistory("Completed")
+
+            if (disconnected) {
+                val result = when {
+                    wasConnected -> "Completed"
+                    sipCall.lastStatusCode >= 300 -> "Failed ${sipCall.lastStatusCode}${sipCall.lastReason.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""}"
+                    isIncomingCall -> "Missed"
+                    else -> "Not answered"
+                }
+                saveHistory(result, sipCall.durationSeconds())
                 restoreAudioRouting()
-                finish()
+                scheduleFinish()
             }
         }
     }
 
-    private fun saveHistory(result: String) {
+    private fun scheduleFinish() {
+        if (finishScheduled || isFinishing) return
+        finishScheduled = true
+        Handler(Looper.getMainLooper()).postDelayed({ if (!isFinishing) finish() }, 700L)
+    }
+
+    private fun saveHistory(result: String, durationSeconds: Long = 0L) {
         if (!historySaved && remoteNumber.isNotBlank()) {
             historySaved = true
-            CallHistoryStore.add(this, remoteNumber, if (isIncomingCall) "Incoming" else "Outgoing", result)
+            CallHistoryStore.add(this, remoteNumber, if (isIncomingCall) "Incoming" else "Outgoing", result, durationSeconds)
         }
     }
 

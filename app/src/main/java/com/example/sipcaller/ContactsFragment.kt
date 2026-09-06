@@ -1,69 +1,80 @@
 package com.example.sipcaller
 
-import android.app.AlertDialog
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
-import android.text.InputType
 import android.view.*
 import android.widget.*
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 
 class ContactsFragment : Fragment() {
     private lateinit var list: LinearLayout
     private lateinit var empty: TextView
     private lateinit var scroll: ScrollView
+    private lateinit var search: EditText
+    private var allContacts: List<SipContact> = emptyList()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val view = inflater.inflate(R.layout.fragment_contacts, container, false)
         list = view.findViewById(R.id.contactsList)
         empty = view.findViewById(R.id.contactsEmptyText)
         scroll = view.findViewById(R.id.contactsScroll)
-        view.findViewById<Button>(R.id.addContactButton).setOnClickListener { showAddDialog() }
-        render()
+        search = view.findViewById(R.id.contactsSearch)
+        search.addTextChangedListener(SimpleTextWatcher { render() })
+
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), CONTACTS_PERMISSION)
+        } else loadContacts()
         return view
     }
 
-    override fun onResume() { super.onResume(); if (::list.isInitialized) render() }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == CONTACTS_PERMISSION) loadContacts()
+    }
+
+    override fun onResume() { super.onResume(); if (::list.isInitialized && ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) loadContacts() }
+
+    private fun loadContacts() {
+        allContacts = ContactStore.getPhoneContacts(requireContext())
+        render()
+    }
 
     private fun render() {
-        val contacts = ContactStore.getAll(requireContext())
+        val q = if (::search.isInitialized) search.text.toString().trim() else ""
+        val contacts = allContacts.filter { it.name.contains(q, true) || it.number.contains(q, true) }
         list.removeAllViews()
         empty.visibility = if (contacts.isEmpty()) View.VISIBLE else View.GONE
         scroll.visibility = if (contacts.isEmpty()) View.GONE else View.VISIBLE
+        empty.text = when {
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED -> "Contacts permission is required\nAllow permission to show phone contacts"
+            q.isNotBlank() -> "No matching contacts"
+            else -> "No phone contacts found"
+        }
         contacts.forEach { contact ->
             val row = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.VERTICAL; setPadding(16, 20, 16, 20)
+                orientation = LinearLayout.VERTICAL
+                setPadding(24, 22, 24, 22)
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 setBackgroundResource(android.R.drawable.list_selector_background)
             }
             row.addView(TextView(requireContext()).apply { text = contact.name; textSize = 18f; setTypeface(null, android.graphics.Typeface.BOLD) })
             row.addView(TextView(requireContext()).apply { text = contact.number; textSize = 15f })
             row.setOnClickListener { call(contact.number) }
-            row.setOnLongClickListener {
-                AlertDialog.Builder(requireContext()).setTitle(contact.name).setItems(arrayOf("Call", "Delete")) { _, which ->
-                    if (which == 0) call(contact.number) else { ContactStore.delete(requireContext(), contact.number); render() }
-                }.show(); true
-            }
             list.addView(row)
         }
-    }
-
-    private fun showAddDialog() {
-        val box = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 24, 48, 0) }
-        val name = EditText(requireContext()).apply { hint = "Name" }
-        val number = EditText(requireContext()).apply { hint = "SIP number"; inputType = InputType.TYPE_CLASS_PHONE }
-        box.addView(name); box.addView(number)
-        AlertDialog.Builder(requireContext()).setTitle("Add Contact").setView(box).setNegativeButton("Cancel", null)
-            .setPositiveButton("Save") { _, _ ->
-                val n = name.text.toString().trim(); val p = number.text.toString().trim()
-                if (n.isNotEmpty() && p.isNotEmpty()) { ContactStore.save(requireContext(), SipContact(n, p)); render() }
-            }.show()
     }
 
     private fun call(number: String) {
         if (!SipManager.isAccountRegistered()) { Toast.makeText(requireContext(), "Account is offline", Toast.LENGTH_SHORT).show(); return }
         val call = SipManager.makeCall(number) ?: run { Toast.makeText(requireContext(), "Could not start call", Toast.LENGTH_SHORT).show(); return }
         CallActivity.pendingCall = call
-        startActivity(Intent(requireContext(), CallActivity::class.java).putExtra(CallActivity.EXTRA_INCOMING, false).putExtra(CallActivity.EXTRA_REMOTE, number))
+        startActivity(Intent(requireContext(), CallActivity::class.java)
+            .putExtra(CallActivity.EXTRA_INCOMING, false)
+            .putExtra(CallActivity.EXTRA_REMOTE, number))
     }
+
+    companion object { private const val CONTACTS_PERMISSION = 301 }
 }

@@ -1,6 +1,7 @@
 package com.example.sipcaller
 
 import android.content.Context
+import android.provider.ContactsContract
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -21,20 +22,56 @@ object ContactStore {
         } catch (_: Exception) { mutableListOf() }
     }
 
+    fun getPhoneContacts(context: Context): List<SipContact> {
+        val result = LinkedHashMap<String, SipContact>()
+        val projection = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            ContactsContract.CommonDataKinds.Phone.NUMBER
+        )
+        try {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                projection, null, null,
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE NOCASE ASC"
+            )?.use { cursor ->
+                val nameIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val numberIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                while (cursor.moveToNext()) {
+                    val name = cursor.getString(nameIndex)?.trim().orEmpty()
+                    val number = cursor.getString(numberIndex)?.trim().orEmpty()
+                    if (name.isNotBlank() && number.isNotBlank()) {
+                        val key = normalize(number)
+                        if (key.isNotBlank()) result.putIfAbsent(key, SipContact(name, number))
+                    }
+                }
+            }
+        } catch (_: SecurityException) { }
+        return result.values.toList()
+    }
+
     fun save(context: Context, contact: SipContact) {
-        val list = getAll(context).filterNot { it.number == contact.number }.toMutableList()
+        val key = normalize(contact.number)
+        val list = getAll(context).filterNot { normalize(it.number) == key }.toMutableList()
         list.add(0, contact)
         persist(context, list)
     }
 
     fun delete(context: Context, number: String) {
-        persist(context, getAll(context).filterNot { it.number == number })
+        val key = normalize(number)
+        persist(context, getAll(context).filterNot { normalize(it.number) == key })
     }
 
     fun findName(context: Context, numberOrUri: String): String? {
         val number = numberOrUri.substringBefore("@").removePrefix("sip:")
-        return getAll(context).firstOrNull { it.number == number }?.name
+        val key = normalize(number)
+        getAll(context).firstOrNull { normalize(it.number) == key }?.let { return it.name }
+        return getPhoneContacts(context).firstOrNull { normalize(it.number) == key }?.name
     }
+
+    fun normalize(number: String): String = number
+        .substringBefore("@")
+        .removePrefix("sip:")
+        .replace(Regex("[^0-9+*#]"), "")
 
     private fun persist(context: Context, contacts: List<SipContact>) {
         val array = JSONArray()
