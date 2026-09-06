@@ -2,6 +2,7 @@ package com.example.sipcaller
 
 import android.app.*
 import android.content.*
+import android.content.pm.PackageManager
 import android.os.*
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -34,14 +35,24 @@ class SipIncomingCallHandler(private val context: Context) {
             .addAction(android.R.drawable.ic_menu_call, "Answer", answerIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declineIntent)
             .build()
-        NotificationManagerCompat.from(appContext).notify(NOTIFICATION_ID, notification)
+        if (canPostNotifications()) {
+            try {
+                NotificationManagerCompat.from(appContext).notify(NOTIFICATION_ID, notification)
+            } catch (_: SecurityException) {
+                // Notification permission can be revoked while the app is running.
+            }
+        }
     }
 
     fun stop() {
         alert.stop()
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
-        NotificationManagerCompat.from(appContext).cancel(NOTIFICATION_ID)
+        try {
+            NotificationManagerCompat.from(appContext).cancel(NOTIFICATION_ID)
+        } catch (_: SecurityException) {
+            // Safe cleanup if notification permission/state changed.
+        }
     }
 
     private fun acquireWakeLock() {
@@ -67,6 +78,11 @@ class SipIncomingCallHandler(private val context: Context) {
                 setBypassDnd(true)
             })
         }
+    }
+
+    private fun canPostNotifications(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            appContext.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun immutable() = if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
