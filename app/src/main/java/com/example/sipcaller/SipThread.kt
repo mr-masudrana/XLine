@@ -19,14 +19,14 @@ internal object SipThread {
     private var handler: Handler? = null
     private val lifecycleLock = Any()
 
-    fun start() = synchronized(lifecycleLock) {
-        if (thread?.isAlive == true && handler != null) return
-        HandlerThread("SipCaller-PJSIP").also {
-            it.start()
-            thread = it
-            handler = Handler(it.looper)
-            Log.i(TAG, "PJSIP app thread started")
-        }
+    fun start(): Unit = synchronized(lifecycleLock) {
+        if (thread?.isAlive == true && handler != null) return@synchronized
+
+        val newThread = HandlerThread("SipCaller-PJSIP")
+        newThread.start()
+        thread = newThread
+        handler = Handler(newThread.looper)
+        Log.i(TAG, "PJSIP app thread started")
     }
 
     fun isCurrentThread(): Boolean = Thread.currentThread() === thread
