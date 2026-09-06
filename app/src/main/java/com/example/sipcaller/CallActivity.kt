@@ -30,6 +30,16 @@ class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
     private lateinit var persistentCallState: PersistentCallState
     private val mainHandler = Handler(Looper.getMainLooper())
     private var connectedAtMs = 0L
+    private var hangupRequested = false
+    private val hangupFallback = Runnable {
+        if (!isFinishing && finishScheduled.not()) {
+            statusBadge.text = "Call ended"
+            mainHandler.removeCallbacks(durationTicker)
+            persistentCallState.clear()
+            restoreAudioRouting()
+            scheduleFinish()
+        }
+    }
 
     private lateinit var statusBadge: TextView
     private lateinit var durationText: TextView
@@ -90,7 +100,7 @@ class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
 
         answerBtn.setOnClickListener { SipIncomingCallController.answer(this); incomingRow.visibility = View.GONE; statusBadge.text = "Connecting…" }
         declineBtn.setOnClickListener { locallyDeclined = true; SipIncomingCallController.decline() }
-        hangupBtn.setOnClickListener { call?.hangupCall(); statusBadge.text = "Ending…" }
+        hangupBtn.setOnClickListener { requestHangup() }
         muteButton.setOnClickListener { toggleMute() }
         speakerButton.setOnClickListener { toggleSpeaker() }
         holdButton.setOnClickListener { toggleHold() }
@@ -109,6 +119,16 @@ class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
             R.id.dtmfStar to "*", R.id.dtmf0 to "0", R.id.dtmfHash to "#"
         )
         keys.forEach { (id, tone) -> findViewById<View>(id).setOnClickListener { call?.sendDtmf(tone) } }
+    }
+
+    private fun requestHangup() {
+        if (hangupRequested) return
+        hangupRequested = true
+        statusBadge.text = "Ending…"
+        call?.hangupCall()
+        // PJSIP should send DISCONNECTED shortly after hangup. This fallback prevents
+        // the UI from being permanently stuck if a broken/native callback is lost.
+        mainHandler.postDelayed(hangupFallback, 3_000L)
     }
 
     private fun toggleMute() { isMuted = audioController.setMuted(!audioController.isMuted()); muteButton.isSelected = isMuted }
@@ -136,6 +156,7 @@ class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
             }
             if (disconnected) {
                 mainHandler.removeCallbacks(durationTicker)
+                mainHandler.removeCallbacks(hangupFallback)
                 SipIncomingCallController.stop()
                 val outcome = CallHistoryClassifier.classify(isIncomingCall, wasConnected, sipCall.lastStatusCode, sipCall.lastReason, locallyDeclined)
                 saveHistory(outcome.result, sipCall.durationSeconds())
@@ -149,6 +170,12 @@ class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
     private fun saveHistory(result: String, durationSeconds: Long = 0L) { if (!historySaved && remoteNumber.isNotBlank()) { historySaved = true; CallHistoryStore.add(this, remoteNumber, if (isIncomingCall) "Incoming" else "Outgoing", result, durationSeconds) } }
     override fun onIncomingCall(call: SipCall) {}
     override fun onRegistrationStateChanged(isRegistered: Boolean, statusText: String) {}
-    override fun onDestroy() { mainHandler.removeCallbacks(durationTicker); SipManager.removeListener(this); restoreAudioRouting(); super.onDestroy() }
+    override fun onDestroy() {
+        mainHandler.removeCallbacks(durationTicker)
+        mainHandler.removeCallbacks(hangupFallback)
+        SipManager.removeListener(this)
+        restoreAudioRouting()
+        super.onDestroy()
+    }
     companion object { const val EXTRA_INCOMING = "extra_incoming"; const val EXTRA_REMOTE = "extra_remote"; var pendingCall: SipCall? = null }
 }

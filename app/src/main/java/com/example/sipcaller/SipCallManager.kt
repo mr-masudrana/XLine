@@ -13,11 +13,22 @@ internal object SipCallManager {
         val acc = SipAccountManager.account() ?: return@call null
         if (!SipAccountManager.isRegistered()) return@call null
         try {
-            val target = destination.removePrefix("sip:").trim().replace(Regex("[\\s()\\-]"), "")
-            val uri = if (target.contains("@")) "sip:$target" else "sip:$target@${acc.accCfgDomain}:${acc.accCfgPort}"
+            val raw = destination.trim()
+            val target = raw.removePrefix("sip:").replace(Regex("[\\s()\\-]"), "")
+            val uri = when {
+                raw.startsWith("sip:", ignoreCase = true) && raw.contains("@") -> raw
+                target.contains("@") -> "sip:$target"
+                acc.accCfgPort > 0 && acc.accCfgPort != 5060 -> "sip:$target@${acc.accCfgDomain}:${acc.accCfgPort}"
+                else -> "sip:$target@${acc.accCfgDomain}"
+            }
+            Log.i(TAG, "Starting outgoing call: $uri")
             SipCall(acc).also { call ->
                 activeCall = call
-                call.makeCall(uri, CallOpParam(true))
+                val prm = CallOpParam(true).apply {
+                    opt.audioCount = 1
+                    opt.videoCount = 0
+                }
+                call.makeCall(uri, prm)
             }
         } catch (t: Throwable) { Log.e(TAG, "makeCall failed", t); null }
     }

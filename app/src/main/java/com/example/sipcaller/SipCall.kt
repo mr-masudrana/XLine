@@ -30,7 +30,7 @@ class SipCall : Call {
 
     fun answer() = SipManager.postNative {
         runCatching {
-            val prm = CallOpParam()
+            val prm = CallOpParam(true)
             prm.statusCode = pjsip_status_code.PJSIP_SC_OK
             answer(prm)
         }.onFailure { Log.e(TAG, "answer() failed", it) }
@@ -38,7 +38,7 @@ class SipCall : Call {
 
     fun decline() = SipManager.postNative {
         runCatching {
-            val prm = CallOpParam()
+            val prm = CallOpParam(true)
             prm.statusCode = pjsip_status_code.PJSIP_SC_BUSY_HERE
             hangup(prm)
         }.onFailure { Log.e(TAG, "decline() failed", it) }
@@ -46,7 +46,7 @@ class SipCall : Call {
 
     fun hangupCall() = SipManager.postNative {
         runCatching {
-            val prm = CallOpParam()
+            val prm = CallOpParam(true)
             prm.statusCode = pjsip_status_code.PJSIP_SC_DECLINE
             hangup(prm)
         }.onFailure { Log.e(TAG, "hangupCall() failed", it) }
@@ -71,24 +71,32 @@ class SipCall : Call {
         return ((until - from) / 1000L).coerceAtLeast(0L)
     }
 
-    fun isDisconnected(): Boolean = lastState.contains("DISCONN", true) || endedAt > 0L
+    fun isDisconnected(): Boolean = lastState == STATE_DISCONNECTED || endedAt > 0L
 
     override fun onCallState(prm: OnCallStateParam) {
         synchronized(SipManager.nativeLock) {
             try {
                 val ci = info
                 remoteUri = ci.remoteUri
-                lastState = ci.state.toString()
-                lastStatusCode = ci.lastStatusCode.toInt()
-                lastReason = ci.lastReason
-                if (lastState.contains("CONFIRMED", true) && connectedAt == 0L) connectedAt = System.currentTimeMillis()
-                if (lastState.contains("DISCONN", true)) endedAt = System.currentTimeMillis()
-                Log.i(TAG, "Call state=$lastState code=$lastStatusCode reason=$lastReason remote=$remoteUri")
+                lastState = mapState(ci.state)
+                lastStatusCode = try { ci.lastStatusCode.toInt() } catch (_: Throwable) { 0 }
+                lastReason = ci.lastReason ?: ""
+
+                if (lastState == STATE_CONFIRMED && connectedAt == 0L) {
+                    connectedAt = System.currentTimeMillis()
+                }
+                if (lastState == STATE_DISCONNECTED) {
+                    endedAt = System.currentTimeMillis()
+                }
+
+                Log.i(
+                    TAG,
+                    "Call state=$lastState native=${ci.stateText} code=$lastStatusCode reason=$lastReason remote=$remoteUri"
+                )
                 SipManager.dispatchCallState(this, lastState)
-                if (lastState.contains("DISCONN", true)) {
+                if (lastState == STATE_DISCONNECTED) {
                     SipManager.clearActiveCall(this)
                 }
-                Unit
             } catch (e: Throwable) {
                 Log.e(TAG, "onCallState error", e)
             }
@@ -100,7 +108,9 @@ class SipCall : Call {
             try {
                 val ci = info
                 for (mi in ci.media) {
-                    if (mi.type == pjmedia_type.PJMEDIA_TYPE_AUDIO && mi.status == pjsua_call_media_status.PJSUA_CALL_MEDIA_ACTIVE) {
+                    if (mi.type == pjmedia_type.PJMEDIA_TYPE_AUDIO &&
+                        mi.status == pjsua_call_media_status.PJSUA_CALL_MEDIA_ACTIVE
+                    ) {
                         val aum = AudioMedia.typecastFromMedia(getMedia(mi.index))
                         val ep = Endpoint.instance()
                         ep.audDevManager().captureDevMedia.startTransmit(aum)
@@ -111,5 +121,26 @@ class SipCall : Call {
                 Log.e(TAG, "onCallMediaState error", e)
             }
         }
+    }
+
+    private fun mapState(state: pjsip_inv_state): String = when (state) {
+        pjsip_inv_state.PJSIP_INV_STATE_CALLING -> STATE_CALLING
+        pjsip_inv_state.PJSIP_INV_STATE_INCOMING -> STATE_INCOMING
+        pjsip_inv_state.PJSIP_INV_STATE_EARLY -> STATE_EARLY
+        pjsip_inv_state.PJSIP_INV_STATE_CONNECTING -> STATE_CONNECTING
+        pjsip_inv_state.PJSIP_INV_STATE_CONFIRMED -> STATE_CONFIRMED
+        pjsip_inv_state.PJSIP_INV_STATE_DISCONNECTED,
+        pjsip_inv_state.PJSIP_INV_STATE_NULL -> STATE_DISCONNECTED
+        else -> STATE_IDLE
+    }
+
+    companion object {
+        const val STATE_IDLE = "IDLE"
+        const val STATE_CALLING = "CALLING"
+        const val STATE_INCOMING = "INCOMING"
+        const val STATE_EARLY = "EARLY"
+        const val STATE_CONNECTING = "CONNECTING"
+        const val STATE_CONFIRMED = "CONFIRMED"
+        const val STATE_DISCONNECTED = "DISCONNECTED"
     }
 }
