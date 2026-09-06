@@ -22,7 +22,6 @@ class HomeActivity : AppCompatActivity() {
                 R.id.nav_dialpad -> DialpadFragment()
                 R.id.nav_contacts -> ContactsFragment()
                 R.id.nav_history -> HistoryFragment()
-                R.id.nav_chat -> ChatFragment()
                 R.id.nav_more -> MoreFragment()
                 else -> DialpadFragment()
             }

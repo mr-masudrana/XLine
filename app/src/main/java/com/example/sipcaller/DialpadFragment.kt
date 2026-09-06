@@ -89,6 +89,11 @@ class DialpadFragment : Fragment(), SipManager.SipCallListener {
         }
     }
 
+    override fun onDestroyView() {
+        SipManager.removeListener(this)
+        super.onDestroyView()
+    }
+
     override fun onIncomingCall(call: SipCall) {
         activity?.runOnUiThread {
             CallActivity.pendingCall = call
