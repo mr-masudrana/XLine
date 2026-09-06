@@ -100,6 +100,7 @@ class LoginActivity : AppCompatActivity() {
         SessionStore.domain = domain
 
         statusText.text = "Registering…"
+        SipPreferences(this).save(accountName.ifEmpty { username }, creds)
         SipManager.registerAccount(creds)
 
         val serviceIntent = Intent(this, SipCallService::class.java)

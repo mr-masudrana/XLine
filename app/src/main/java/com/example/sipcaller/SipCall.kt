@@ -74,7 +74,8 @@ class SipCall : Call {
             remoteUri = ci.remoteUri
             val stateText = ci.stateText
             Log.i(TAG, "Call state: $stateText")
-            SipManager.callListener?.onCallStateChanged(this, stateText)
+            SipManager.dispatchCallState(this, stateText)
+            if (ci.state == pjsip_inv_state.PJSIP_INV_STATE_DISCONNECTED) SipManager.clearActiveCall(this)
         } catch (e: Exception) {
             Log.e(TAG, "onCallState error", e)
         }

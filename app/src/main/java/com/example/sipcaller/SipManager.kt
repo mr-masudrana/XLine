@@ -1,144 +1,68 @@
 package com.example.sipcaller
 
 import android.util.Log
+import java.util.concurrent.CopyOnWriteArraySet
 import org.pjsip.pjsua2.*
 
-/**
- * Thin wrapper around PJSUA2 (pjsua2.aar). Owns the Endpoint lifecycle,
- * SIP account registration, and outgoing/incoming call setup.
- *
- * Transport is fixed to UDP per project requirements. If your provider
- * ever moves to TCP/TLS, add a second TransportConfig + createTransport
- * call using PJSIP_TRANSPORT_TCP / PJSIP_TRANSPORT_TLS.
- */
+/** Process-wide PJSUA2 gateway. UI never owns the native endpoint. */
 object SipManager {
-
     private const val TAG = "SipManager"
-
     private var endpoint: Endpoint? = null
     private var account: SipAccount? = null
+    private var credentials: SipCredentials? = null
     private var isRegistered = false
+    private var activeCall: SipCall? = null
+    private val listeners = CopyOnWriteArraySet<SipCallListener>()
 
-    fun isAccountRegistered(): Boolean = isRegistered
-
-    /** Called by SipAccount.onRegState — not meant to be called from UI code. */
-    fun setRegistered(registered: Boolean) {
-        isRegistered = registered
-    }
-
-    data class SipCredentials(
-        val username: String,     // SIP extension / auth username
-        val password: String,
-        val domain: String,       // e.g. sip.yourprovider.com
-        val port: Int = 5060,     // default SIP UDP port, override if your provider uses another
-        val proxy: String? = null // optional outbound proxy, e.g. "sip:sbc.yourprovider.com:5060"
-    )
-
-    var callListener: SipCallListener? = null
-
+    data class SipCredentials(val username: String, val password: String, val domain: String, val port: Int = 5060, val proxy: String? = null)
     interface SipCallListener {
         fun onIncomingCall(call: SipCall)
         fun onCallStateChanged(call: SipCall, state: String)
         fun onRegistrationStateChanged(isRegistered: Boolean, statusText: String)
     }
+    fun addListener(listener: SipCallListener) { listeners.add(listener) }
+    fun removeListener(listener: SipCallListener) { listeners.remove(listener) }
+    fun isAccountRegistered() = isRegistered
+    fun currentCall() = activeCall
+    fun setRegistered(registered: Boolean) { isRegistered = registered }
+    fun dispatchRegistration(registered: Boolean, text: String) { listeners.forEach { it.onRegistrationStateChanged(registered, text) } }
+    fun dispatchIncoming(call: SipCall) { activeCall = call; listeners.forEach { it.onIncomingCall(call) } }
+    fun dispatchCallState(call: SipCall, state: String) { activeCall = call; listeners.forEach { it.onCallStateChanged(call, state) } }
 
-    /** Call once, e.g. from Application.onCreate(). */
-    fun init() {
-        if (endpoint != null) return
-
-        try {
-            endpoint = Endpoint()
-            endpoint!!.libCreate()
-
-            val epConfig = EpConfig()
-            epConfig.logConfig.level = 4
-            epConfig.logConfig.consoleLevel = 4
-            epConfig.uaConfig.maxCalls = 4
-
-            endpoint!!.libInit(epConfig)
-
-            // --- UDP transport ---
-            val udpCfg = TransportConfig()
-            udpCfg.port = 0L // 0 = let PJSIP pick a free local port
-            endpoint!!.transportCreate(
-                pjsip_transport_type_e.PJSIP_TRANSPORT_UDP,
-                udpCfg
-            )
-
-            endpoint!!.libStart()
-            Log.i(TAG, "PJSIP endpoint started (UDP)")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to init PJSIP endpoint", e)
-        }
-    }
-
-    fun registerAccount(creds: SipCredentials) {
-        isRegistered = false
-        try {
-            account?.delete()
-
-            val accCfg = AccountConfig()
-            val sipUri = "sip:${creds.username}@${creds.domain}:${creds.port}"
-            accCfg.idUri = sipUri
-            accCfg.regConfig.registrarUri = "sip:${creds.domain}:${creds.port}"
-            accCfg.regConfig.registerOnAdd = true
-            accCfg.regConfig.timeoutSec = 300L // re-register every 5 min, keeps UDP NAT binding alive
-
-            val cred = AuthCredInfo(
-                "digest",
-                "*", // wildcard realm — matches whatever realm the server challenges with,
-                     // which often isn't the same string as the SIP domain
-                creds.username,
-                0,
-                creds.password
-            )
-            accCfg.sipConfig.authCreds.add(cred)
-
-            if (!creds.proxy.isNullOrBlank()) {
-                accCfg.sipConfig.proxies.add(creds.proxy)
-            }
-
-            // NAT keep-alive: important on UDP, sends periodic empty packets
-            // so the router's NAT mapping doesn't expire and drop incoming calls.
-            accCfg.natConfig.udpKaIntervalSec = 15L
-
-            account = SipAccount(accCfg)
-            account!!.create(accCfg)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to register account", e)
-        }
-    }
-
-    fun makeCall(destinationNumber: String): SipCall? {
-        val acc = account ?: run {
-            Log.e(TAG, "No account created yet")
-            return null
-        }
-        if (!isRegistered) {
-            Log.e(TAG, "Refusing to call: account is not registered")
-            return null
-        }
+    @Synchronized fun init(): Boolean {
+        if (endpoint != null) return true
         return try {
-            val destUri = "sip:$destinationNumber@${acc.accCfgDomain}"
-            val call = SipCall(acc)
-            val prm = CallOpParam(true)
-            call.makeCall(destUri, prm)
-            call
-        } catch (e: Exception) {
-            Log.e(TAG, "makeCall failed", e)
-            null
-        }
+            Endpoint().also { ep ->
+                ep.libCreate(); val cfg = EpConfig(); cfg.logConfig.level = 4; cfg.logConfig.consoleLevel = 4; cfg.uaConfig.maxCalls = 4
+                ep.libInit(cfg); val transport = TransportConfig(); transport.port = 0L
+                ep.transportCreate(pjsip_transport_type_e.PJSIP_TRANSPORT_UDP, transport); ep.libStart(); endpoint = ep
+            }
+            true
+        } catch (e: Exception) { Log.e(TAG, "PJSIP init failed", e); endpoint = null; false }
     }
 
-    fun shutdown() {
-        try {
-            account?.delete()
-            account = null
-            endpoint?.libDestroy()
-            endpoint?.delete()
-            endpoint = null
-        } catch (e: Exception) {
-            Log.e(TAG, "Error during shutdown", e)
-        }
+    @Synchronized fun registerAccount(creds: SipCredentials): Boolean {
+        if (!init()) return false
+        credentials = creds; isRegistered = false
+        return try {
+            account?.delete(); val cfg = AccountConfig(); val host = "${creds.domain}:${creds.port}"
+            cfg.idUri = "sip:${creds.username}@$host"; cfg.regConfig.registrarUri = "sip:$host"; cfg.regConfig.registerOnAdd = true
+            cfg.regConfig.timeoutSec = 300L; cfg.sipConfig.authCreds.add(AuthCredInfo("digest", "*", creds.username, 0, creds.password))
+            if (!creds.proxy.isNullOrBlank()) cfg.sipConfig.proxies.add(creds.proxy)
+            cfg.natConfig.udpKaIntervalSec = 15L
+            SipAccount(cfg, creds.domain, creds.port).also { it.create(cfg); account = it }; true
+        } catch (e: Exception) { Log.e(TAG, "Registration setup failed", e); false }
     }
+
+    fun restoreAndRegister(context: android.content.Context): Boolean = SipPreferences(context).load()?.let { registerAccount(it) } ?: false
+    fun makeCall(destination: String): SipCall? {
+        val acc = account ?: return null; if (!isRegistered) return null
+        return try {
+            val target = destination.removePrefix("sip:").trim()
+            val uri = if (target.contains("@")) "sip:$target" else "sip:$target@${acc.accCfgDomain}:${acc.accCfgPort}"
+            SipCall(acc).also { call -> activeCall = call; call.makeCall(uri, CallOpParam(true)) }
+        } catch (e: Exception) { Log.e(TAG, "makeCall failed", e); null }
+    }
+    fun clearActiveCall(call: SipCall? = null) { if (call == null || activeCall === call) activeCall = null }
+    @Synchronized fun shutdown() { try { activeCall?.delete(); activeCall = null; account?.delete(); account = null; endpoint?.libDestroy(); endpoint?.delete() } catch (e: Exception) { Log.e(TAG, "shutdown", e) } finally { endpoint = null; isRegistered = false } }
 }

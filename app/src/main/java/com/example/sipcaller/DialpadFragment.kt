@@ -42,7 +42,7 @@ class DialpadFragment : Fragment(), SipManager.SipCallListener {
         view.findViewById<ImageButton>(R.id.backspaceButton).setOnClickListener { removeLastDigit() }
         view.findViewById<ImageButton>(R.id.callButton).setOnClickListener { onCallClicked() }
 
-        SipManager.callListener = this
+        SipManager.addListener(this)
         return view
     }
 

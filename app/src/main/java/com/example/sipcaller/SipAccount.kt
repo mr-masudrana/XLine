@@ -3,24 +3,21 @@ package com.example.sipcaller
 import android.util.Log
 import org.pjsip.pjsua2.*
 
-class SipAccount(private val cfg: AccountConfig) : Account() {
+class SipAccount(private val cfg: AccountConfig, val accCfgDomain: String, val accCfgPort: Int) : Account() {
 
     private val TAG = "SipAccount"
-
-    // Domain kept around so SipManager can build "sip:number@domain" URIs
-    val accCfgDomain: String = cfg.idUri.substringAfter("@").substringBefore(":")
 
     override fun onRegState(prm: OnRegStateParam) {
         val code = prm.code
         val isOk = code in 200..299
         Log.i(TAG, "Registration state: $code ${prm.reason}")
         SipManager.setRegistered(isOk)
-        SipManager.callListener?.onRegistrationStateChanged(isOk, "$code ${prm.reason}")
+        SipManager.dispatchRegistration(isOk, "$code ${prm.reason}")
     }
 
     override fun onIncomingCall(prm: OnIncomingCallParam) {
         val call = SipCall(this, prm.callId)
         Log.i(TAG, "Incoming call, id=${prm.callId}")
-        SipManager.callListener?.onIncomingCall(call)
+        SipManager.dispatchIncoming(call)
     }
 }

@@ -72,7 +72,7 @@ class CallActivity : AppCompatActivity(), SipManager.SipCallListener {
         // Route audio for a voice call while this screen is up.
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
 
-        SipManager.callListener = this
+        SipManager.addListener(this)
     }
 
     private fun toggleMute() {
