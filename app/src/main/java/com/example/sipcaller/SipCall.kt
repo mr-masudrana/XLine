@@ -85,7 +85,10 @@ class SipCall : Call {
                 if (lastState.contains("DISCONN", true)) endedAt = System.currentTimeMillis()
                 Log.i(TAG, "Call state=$lastState code=$lastStatusCode reason=$lastReason remote=$remoteUri")
                 SipManager.dispatchCallState(this, lastState)
-                if (lastState.contains("DISCONN", true)) SipManager.clearActiveCall(this)
+                if (lastState.contains("DISCONN", true)) {
+                    SipManager.clearActiveCall(this)
+                }
+                Unit
             } catch (e: Throwable) {
                 Log.e(TAG, "onCallState error", e)
             }
