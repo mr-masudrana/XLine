@@ -29,7 +29,7 @@ class HistoryFragment : Fragment() {
             val row = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(16, 20, 16, 20); setBackgroundResource(android.R.drawable.list_selector_background) }
             val name = ContactStore.findName(requireContext(), item.number) ?: item.number
             val arrow = if (item.direction == "Incoming") "↓ Incoming" else "↑ Outgoing"
-            row.addView(TextView(requireContext()).apply { text = name; textSize = 18f; setTypeface(null, 1) })
+            row.addView(TextView(requireContext()).apply { text = name; textSize = 18f; setTypeface(null, android.graphics.Typeface.BOLD) })
             row.addView(TextView(requireContext()).apply { text = "$arrow • ${item.result} • ${DateFormat.format("MMM d, h:mm a", Date(item.timestamp))}"; textSize = 13f })
             row.setOnClickListener { call(item.number) }
             list.addView(row)

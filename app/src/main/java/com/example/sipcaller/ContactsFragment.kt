@@ -36,7 +36,7 @@ class ContactsFragment : Fragment() {
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 setBackgroundResource(android.R.drawable.list_selector_background)
             }
-            row.addView(TextView(requireContext()).apply { text = contact.name; textSize = 18f; setTypeface(null, 1) })
+            row.addView(TextView(requireContext()).apply { text = contact.name; textSize = 18f; setTypeface(null, android.graphics.Typeface.BOLD) })
             row.addView(TextView(requireContext()).apply { text = contact.number; textSize = 15f })
             row.setOnClickListener { call(contact.number) }
             row.setOnLongClickListener {
