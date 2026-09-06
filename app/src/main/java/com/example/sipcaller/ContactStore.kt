@@ -41,7 +41,9 @@ object ContactStore {
                     val number = cursor.getString(numberIndex)?.trim().orEmpty()
                     if (name.isNotBlank() && number.isNotBlank()) {
                         val key = normalize(number)
-                        if (key.isNotBlank()) result.putIfAbsent(key, SipContact(name, number))
+                        if (key.isNotBlank() && !result.containsKey(key)) {
+                            result[key] = SipContact(name, number)
+                        }
                     }
                 }
             }
