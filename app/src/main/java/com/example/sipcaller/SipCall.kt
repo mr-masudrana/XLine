@@ -97,6 +97,7 @@ class SipCall : Call {
                 if (lastState == STATE_DISCONNECTED) {
                     SipManager.clearActiveCall(this)
                 }
+                Unit
             } catch (e: Throwable) {
                 Log.e(TAG, "onCallState error", e)
             }
@@ -123,14 +124,15 @@ class SipCall : Call {
         }
     }
 
-    private fun mapState(state: pjsip_inv_state): String = when (state) {
-        pjsip_inv_state.PJSIP_INV_STATE_CALLING -> STATE_CALLING
-        pjsip_inv_state.PJSIP_INV_STATE_INCOMING -> STATE_INCOMING
-        pjsip_inv_state.PJSIP_INV_STATE_EARLY -> STATE_EARLY
-        pjsip_inv_state.PJSIP_INV_STATE_CONNECTING -> STATE_CONNECTING
-        pjsip_inv_state.PJSIP_INV_STATE_CONFIRMED -> STATE_CONFIRMED
-        pjsip_inv_state.PJSIP_INV_STATE_DISCONNECTED,
-        pjsip_inv_state.PJSIP_INV_STATE_NULL -> STATE_DISCONNECTED
+    private fun mapState(state: Int): String = when (state) {
+        // pjsip_inv_state numeric values in the PJSUA2 binding used by this project.
+        0 -> STATE_IDLE          // PJSIP_INV_STATE_NULL
+        1 -> STATE_CALLING       // PJSIP_INV_STATE_CALLING
+        2 -> STATE_INCOMING      // PJSIP_INV_STATE_INCOMING
+        3 -> STATE_EARLY         // PJSIP_INV_STATE_EARLY
+        4 -> STATE_CONNECTING    // PJSIP_INV_STATE_CONNECTING
+        5 -> STATE_CONFIRMED     // PJSIP_INV_STATE_CONFIRMED
+        6 -> STATE_DISCONNECTED  // PJSIP_INV_STATE_DISCONNECTED
         else -> STATE_IDLE
     }
 
