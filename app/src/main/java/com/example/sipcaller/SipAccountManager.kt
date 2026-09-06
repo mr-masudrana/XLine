@@ -54,8 +54,12 @@ internal object SipAccountManager {
                     val transportId = SipEngine.currentUdpTransportId()
                     if (transportId >= 0) sipConfig.transportId = transportId
 
-                    // Mobile/NAT defaults aligned with the working reference app.
+                    // Mobile/NAT settings aligned with the working IPDial reference.
+                    natConfig.iceEnabled = false
+                    natConfig.turnEnabled = false
+                    natConfig.sipStunUse = pjsua_stun_use.PJSUA_STUN_USE_DEFAULT
                     natConfig.contactRewriteUse = 1
+                    natConfig.sipOutboundUse = 0
                     natConfig.udpKaIntervalSec = 15L
                 }
 

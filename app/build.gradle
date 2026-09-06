@@ -45,9 +45,10 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 
     // --- PJSIP / pjsua2 ---
-    // OPTION A (quick start): community precompiled AAR with UDP/TCP/TLS support.
-    // Verify this is still published/maintained before relying on it in production.
-    implementation 'com.pjdroid:pjdroid:2.2.4'
+    // Exact PJSIP 2.5 runtime from the proven IPDial reference project.
+    // Java bindings: app/libs/pjsua2-classes.jar
+    // Native runtime: app/src/main/jniLibs/arm64-v8a/libpjsua2.so
+    implementation files('libs/pjsua2-classes.jar')
 
     // OPTION B (recommended long-term): build PJSIP from source yourself
     // (https://trac.pjsip.org/repos/wiki/Getting-Started/Android), drop the
