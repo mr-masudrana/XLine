@@ -21,7 +21,7 @@
         android:theme="@style/Theme.SipCaller">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".LoginActivity"
             android:exported="true"
             android:launchMode="singleTask">
             <intent-filter>
@@ -31,10 +31,31 @@
         </activity>
 
         <activity
+            android:name=".HomeActivity"
+            android:exported="false"
+            android:launchMode="singleTask" />
+
+        <activity
+            android:name=".MyAccountActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".HelpActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".AboutActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".CallActivity"
             android:exported="false"
             android:launchMode="singleTask"
-            android:showOnLockScreen="true"
+            android:showWhenLocked="true"
             android:turnScreenOn="true" />
 
         <!-- Foreground service keeps the UDP SIP registration alive while the
