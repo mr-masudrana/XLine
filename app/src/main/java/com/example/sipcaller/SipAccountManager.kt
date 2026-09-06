@@ -19,27 +19,87 @@ internal object SipAccountManager {
         if (!SipEngine.start()) return false
         return SipEngine.call {
             try {
-                account?.delete()
+                try { account?.delete() } catch (_: Throwable) {}
+                account = null
                 registered = false
                 credentials = creds
-                val cfg = AccountConfig()
-                val host = "${creds.domain}:${creds.port}"
-                cfg.idUri = "sip:${creds.username}@$host"
-                cfg.regConfig.registrarUri = "sip:$host"
-                cfg.regConfig.registerOnAdd = true
-                cfg.regConfig.timeoutSec = 300L
-                cfg.sipConfig.authCreds.add(AuthCredInfo("digest", "*", creds.username, 0, creds.password))
-                if (!creds.proxy.isNullOrBlank()) cfg.sipConfig.proxies.add(creds.proxy)
-                cfg.natConfig.udpKaIntervalSec = 15L
-                account = SipAccount(cfg, creds.domain, creds.port).also { it.create(cfg) }
-                SipDiagnostics.info(TAG, "Registration requested for ${creds.username}@${creds.domain}:${creds.port}")
+
+                val username = creds.username.trim()
+                val password = creds.password
+                val parsed = parseServer(creds.domain, creds.port)
+                val host = parsed.first
+                val port = parsed.second
+
+                require(username.isNotBlank()) { "SIP username is empty" }
+                require(host.isNotBlank()) { "SIP domain is empty" }
+
+                val cfg = AccountConfig().apply {
+                    // Provider-compatible split: identity uses host only, registrar owns port.
+                    // This mirrors the proven IPDial account layout.
+                    idUri = "sip:$username@$host"
+                    regConfig.registrarUri = if (port > 0) "sip:$host:$port" else "sip:$host"
+                    regConfig.registerOnAdd = true
+                    regConfig.timeoutSec = 180L
+                    regConfig.retryIntervalSec = 30L
+                    regConfig.firstRetryIntervalSec = 15L
+                    regConfig.delayBeforeRefreshSec = 90L
+
+                    sipConfig.authCreds.add(
+                        AuthCredInfo("digest", "*", username, 0, password)
+                    )
+
+                    normalizeProxy(creds.proxy)?.let { sipConfig.proxies.add(it) }
+
+                    // Explicitly bind the account to the UDP transport created by SipEngine.
+                    val transportId = SipEngine.currentUdpTransportId()
+                    if (transportId >= 0) sipConfig.transportId = transportId
+
+                    // Mobile/NAT defaults aligned with the working reference app.
+                    natConfig.contactRewriteUse = 1
+                    natConfig.udpKaIntervalSec = 15L
+                }
+
+                account = SipAccount(cfg, host, port).also { it.create(cfg) }
+                SipDiagnostics.info(
+                    TAG,
+                    "Registration requested identity=sip:$username@$host registrar=${cfg.regConfig.registrarUri} transport=${SipEngine.currentUdpTransportId()}"
+                )
                 true
             } catch (t: Throwable) {
+                registered = false
                 Log.e(TAG, "Account registration setup failed", t)
                 SipDiagnostics.error(TAG, "Account registration setup failed", t)
                 false
             }
         } ?: false
+    }
+
+    private fun parseServer(rawDomain: String, requestedPort: Int): Pair<String, Int> {
+        var value = rawDomain.trim()
+            .removePrefix("sip:")
+            .removePrefix("SIP:")
+            .removePrefix("sips:")
+            .removePrefix("SIPS:")
+            .substringBefore("/")
+
+        var port = requestedPort
+        // Simple host:port parsing for the SIP account format used by this project.
+        val colon = value.lastIndexOf(':')
+        if (colon > 0 && value.indexOf(':') == colon) {
+            val parsedPort = value.substring(colon + 1).toIntOrNull()
+            if (parsedPort != null) {
+                value = value.substring(0, colon)
+                if (port <= 0 || port == 5060) port = parsedPort
+            }
+        }
+        return value.trim() to port
+    }
+
+    private fun normalizeProxy(rawProxy: String?): String? {
+        val value = rawProxy?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val noScheme = value.removePrefix("sip:").removePrefix("SIP:")
+        val base = "sip:$noScheme"
+        return if (base.contains(";lr", ignoreCase = true)) base else "$base;lr"
     }
 
     fun onRegistrationState(value: Boolean, text: String) {
@@ -50,7 +110,8 @@ internal object SipAccountManager {
 
     fun destroy() {
         SipEngine.call {
-            try { account?.delete() } catch (t: Throwable) { Log.e(TAG, "Account destroy failed", t) }
+            try { account?.delete() }
+            catch (t: Throwable) { Log.e(TAG, "Account destroy failed", t) }
             finally { account = null; credentials = null; registered = false }
         }
     }
