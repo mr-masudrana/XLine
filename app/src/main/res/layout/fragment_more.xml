@@ -15,10 +15,19 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:text="More"
+            android:text="More &amp; Settings"
             android:textColor="@color/text_primary"
             android:textSize="24sp"
             android:textStyle="bold"
+            android:paddingBottom="2dp" />
+        <TextView
+            android:id="@+id/moreStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="Account, SIP tools and application settings"
+            android:textSize="13sp"
+            android:alpha="0.65"
             android:paddingBottom="20dp" />
 
         <LinearLayout

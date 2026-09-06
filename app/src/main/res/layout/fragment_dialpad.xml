@@ -11,14 +11,15 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="@color/surface"
-        android:padding="20dp">
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="18dp">
 
         <TextView
             android:id="@+id/myIdentityText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/text_primary"
-            android:textSize="20sp"
+            android:textSize="21sp"
             android:textStyle="bold" />
 
         <LinearLayout
@@ -51,7 +52,14 @@
         android:background="@color/divider" />
 
     <!-- Number entry -->
-    <TextView
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
         android:id="@+id/numberDisplay"
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -61,14 +69,25 @@
         android:textColorHint="@color/text_hint"
         android:textColor="@color/text_primary"
         android:textSize="36sp"
-        android:padding="24dp" />
+        android:padding="12dp" />
+
+        <TextView
+            android:id="@+id/contactPreviewText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="Enter SIP number"
+            android:textSize="14sp"
+            android:alpha="0.65"
+            android:maxLines="1"/>
+    </LinearLayout>
 
     <!-- Dial grid -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="32dp"
+        android:paddingHorizontal="28dp"
         android:paddingBottom="8dp">
 
         <LinearLayout style="@style/DialRow">
@@ -97,12 +116,12 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingVertical="16dp">
+        android:paddingVertical="14dp">
 
         <ImageButton
             android:id="@+id/callButton"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
             android:layout_centerInParent="true"
             android:background="@drawable/bg_call_button"
             android:src="@drawable/ic_call"

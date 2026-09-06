@@ -1,6 +1,7 @@
 package com.example.sipcaller
 
 import android.os.Bundle
+import android.content.Intent
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.*
@@ -30,6 +31,25 @@ class SettingsActivity : AppCompatActivity() {
         header.addView(back, LinearLayout.LayoutParams(dp(56), dp(52)))
         header.addView(title)
         root.addView(header)
+
+        section(root, "Appearance")
+        val themeLabel = TextView(this).apply { text = "App theme"; textSize = 16f; setPadding(0, dp(8), 0, dp(4)) }
+        root.addView(themeLabel)
+        val themeHint = TextView(this).apply { text = "Choose Light, Dark, or follow your device setting"; textSize = 13f }
+        root.addView(themeHint)
+        val choices = arrayOf("System default", "Light", "Dark")
+        val modes = arrayOf(com.example.sipcaller.theme.AppThemeController.SYSTEM, com.example.sipcaller.theme.AppThemeController.LIGHT, com.example.sipcaller.theme.AppThemeController.DARK)
+        val spinner = Spinner(this)
+        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, choices)
+        spinner.setSelection(modes.indexOf(com.example.sipcaller.theme.AppThemeController.mode(this)).coerceAtLeast(0))
+        spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                if (modes[position] != com.example.sipcaller.theme.AppThemeController.mode(this@SettingsActivity))
+                    com.example.sipcaller.theme.AppThemeController.set(this@SettingsActivity, modes[position])
+            }
+        }
+        root.addView(spinner)
 
         section(root, "Connection")
         toggle(root, "Auto-start SIP service", "Start and restore SIP service automatically", settings.autoStart) {
@@ -62,6 +82,12 @@ class SettingsActivity : AppCompatActivity() {
         TextView(this).apply {
             text = "Account credentials are managed from My Account. Passwords are not shown here."
             textSize = 13f
+        }.also(root::addView)
+
+        section(root, "Troubleshooting")
+        Button(this).apply {
+            text = "Open SIP Diagnostics"
+            setOnClickListener { startActivity(Intent(this@SettingsActivity, DiagnosticsActivity::class.java)) }
         }.also(root::addView)
 
         setContentView(scroll)

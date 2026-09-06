@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#2962FF</color>
-    <color name="primary_dark">#1A237E</color>
-    <color name="primary_light">#E8EEFF</color>
-    <color name="background">#F5F6FA</color>
+    <color name="primary">#2563EB</color>
+    <color name="primary_dark">#1D4ED8</color>
+    <color name="primary_light">#EFF6FF</color>
+    <color name="primary_soft">#DBEAFE</color>
+    <color name="background">#F8FAFC</color>
     <color name="surface">#FFFFFF</color>
-    <color name="text_primary">#1A1A2E</color>
-    <color name="text_secondary">#6B6F80</color>
-    <color name="text_hint">#9AA0AC</color>
-    <color name="online_green">#2ECC71</color>
-    <color name="danger_red">#FF4757</color>
-    <color name="badge_amber_bg">#FFF3D6</color>
-    <color name="badge_amber_text">#B8860B</color>
-    <color name="divider">#E5E7EE</color>
+    <color name="surface_subtle">#F1F5F9</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="text_hint">#94A3B8</color>
+    <color name="online_green">#16A34A</color>
+    <color name="online_soft">#DCFCE7</color>
+    <color name="danger_red">#DC2626</color>
+    <color name="danger_soft">#FEE2E2</color>
+    <color name="warning">#D97706</color>
+    <color name="badge_amber_bg">#FEF3C7</color>
+    <color name="badge_amber_text">#B45309</color>
+    <color name="divider">#E2E8F0</color>
+    <color name="nav_active">#2563EB</color>
 </resources>

@@ -2,6 +2,7 @@ package com.example.sipcaller
 
 import android.util.Log
 import com.example.sipcaller.diagnostics.SipDiagnostics
+import com.example.sipcaller.diagnostics.SipCallFlowLogger
 import org.pjsip.pjsua2.CallOpParam
 
 /** Owns the active call reference and all app initiated call creation. */
@@ -27,6 +28,7 @@ internal object SipCallManager {
 
             Log.i(TAG, "Starting outgoing call: $uri")
             SipDiagnostics.info(TAG, "Outgoing INVITE target=$uri")
+            SipCallFlowLogger.record(-1, "INVITE_REQUESTED", remote = uri)
 
             val call = SipCall(acc)
             val prm = CallOpParam(true).apply {
@@ -36,7 +38,9 @@ internal object SipCallManager {
 
             call.makeCall(uri, prm)
             activeCall = call
-            SipDiagnostics.info(TAG, "call.makeCall accepted target=$uri callId=${safeCallId(call)}")
+            val callId = safeCallId(call)
+            SipCallFlowLogger.record(callId, "INVITE_SENT", remote = uri)
+            SipDiagnostics.info(TAG, "call.makeCall accepted target=$uri callId=$callId")
             call
         } catch (t: Throwable) {
             activeCall = null

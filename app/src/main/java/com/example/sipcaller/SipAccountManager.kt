@@ -2,6 +2,9 @@ package com.example.sipcaller
 
 import android.util.Log
 import com.example.sipcaller.diagnostics.SipDiagnostics
+import com.example.sipcaller.diagnostics.SipRegistrationMonitor
+import com.example.sipcaller.diagnostics.SipDiagnosticsStore
+import com.example.sipcaller.data.repository.AppSettingsRepository
 import org.pjsip.pjsua2.*
 
 /** Owns account configuration, registration and credential persistence state. */
@@ -16,7 +19,12 @@ internal object SipAccountManager {
     fun credentials() = credentials
 
     fun register(creds: SipManager.SipCredentials): Boolean {
-        if (!SipEngine.start()) return false
+        SipRegistrationMonitor.initializing(creds.domain.trim())
+        if (!SipEngine.start()) {
+            SipRegistrationMonitor.failed(0, "SIP engine failed to start")
+            return false
+        }
+        SipRegistrationMonitor.registering(creds.domain.trim())
         return SipEngine.call {
             try {
                 try { account?.delete() } catch (_: Throwable) {}
@@ -60,7 +68,8 @@ internal object SipAccountManager {
                     natConfig.sipStunUse = pjsua_stun_use.PJSUA_STUN_USE_DEFAULT
                     natConfig.contactRewriteUse = 1
                     natConfig.sipOutboundUse = 0
-                    natConfig.udpKaIntervalSec = 15L
+                    val keepAlive = AppSettingsRepository(com.example.sipcaller.SipApplication.appContext)
+                    natConfig.udpKaIntervalSec = if (keepAlive.keepAliveEnabled) keepAlive.keepAliveSeconds.toLong() else 0L
                 }
 
                 account = SipAccount(cfg, host, port).also { it.create(cfg) }
@@ -68,9 +77,11 @@ internal object SipAccountManager {
                     TAG,
                     "Registration requested identity=sip:$username@$host registrar=${cfg.regConfig.registrarUri} transport=${SipEngine.currentUdpTransportId()}"
                 )
+                SipRegistrationMonitor.registering("$host:$port")
                 true
             } catch (t: Throwable) {
                 registered = false
+                SipRegistrationMonitor.failed(0, t.message ?: "Account registration setup failed")
                 Log.e(TAG, "Account registration setup failed", t)
                 SipDiagnostics.error(TAG, "Account registration setup failed", t)
                 false
@@ -108,6 +119,11 @@ internal object SipAccountManager {
 
     fun onRegistrationState(value: Boolean, text: String) {
         registered = value
+        if (value && SipRegistrationMonitor.snapshot().state != SipRegistrationMonitor.State.REGISTERED) {
+            SipRegistrationMonitor.registered(200, text.ifBlank { "OK" })
+        } else if (!value && SipRegistrationMonitor.snapshot().state == SipRegistrationMonitor.State.REGISTERED) {
+            SipRegistrationMonitor.disconnected(text.ifBlank { "Registration lost" })
+        }
         SipDiagnostics.info(TAG, "Registration state=$value message=$text")
         SipEventDispatcher.registration(value, text)
     }
@@ -116,7 +132,12 @@ internal object SipAccountManager {
         SipEngine.call {
             try { account?.delete() }
             catch (t: Throwable) { Log.e(TAG, "Account destroy failed", t) }
-            finally { account = null; credentials = null; registered = false }
+            finally {
+                account = null
+                credentials = null
+                registered = false
+                SipRegistrationMonitor.disconnected("Account destroyed")
+            }
         }
     }
 }

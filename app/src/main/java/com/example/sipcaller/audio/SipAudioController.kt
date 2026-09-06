@@ -1,15 +1,27 @@
 package com.example.sipcaller.audio
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 
-/** Owns call audio lifecycle and keeps routing state out of CallActivity. */
+/** Owns voice-call audio mode, focus and microphone state. */
 class SipAudioController(context: Context) {
-    private val appContext = context.applicationContext
-    private val audio = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val audio = context.applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private var started = false
     private var muted = false
+    private var focusRequest: AudioFocusRequest? = null
+
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        when (change) {
+            AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                // Preserve user mute choice; only protect privacy on focus loss.
+                if (!muted) audio.isMicrophoneMute = true
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> audio.isMicrophoneMute = muted
+        }
+    }
 
     fun startCallAudio() {
         if (started) return
@@ -24,33 +36,44 @@ class SipAudioController(context: Context) {
         return muted
     }
 
-    fun isMuted(): Boolean = muted
+    fun isMuted() = muted
 
     @Suppress("DEPRECATION")
     fun setSpeaker(enabled: Boolean) { audio.isSpeakerphoneOn = enabled }
 
     @Suppress("DEPRECATION")
-    fun isSpeakerOn(): Boolean = audio.isSpeakerphoneOn
+    fun isSpeakerOn() = audio.isSpeakerphoneOn
 
     fun stopCallAudio() {
         muted = false
         audio.isMicrophoneMute = false
-        @Suppress("DEPRECATION") audio.isSpeakerphoneOn = false
-        audio.mode = AudioManager.MODE_NORMAL
+        @Suppress("DEPRECATION") {
+            audio.isSpeakerphoneOn = false
+            audio.stopBluetoothSco()
+            audio.isBluetoothScoOn = false
+        }
         abandonFocus()
+        audio.mode = AudioManager.MODE_NORMAL
         started = false
     }
 
     @Suppress("DEPRECATION")
     private fun requestFocus() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // MODE_IN_COMMUNICATION is sufficient for API 23+ baseline; focus request remains compatible.
-        }
-        audio.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                .setOnAudioFocusChangeListener(focusListener)
+                .build()
+            audio.requestAudioFocus(focusRequest!!)
+        } else audio.requestAudioFocus(focusListener, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
     }
 
     @Suppress("DEPRECATION")
     private fun abandonFocus() {
-        audio.abandonAudioFocus(null)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) focusRequest?.let { audio.abandonAudioFocusRequest(it) }
+        else audio.abandonAudioFocus(focusListener)
+        focusRequest = null
     }
 }

@@ -15,16 +15,20 @@ class DialpadFragment : Fragment(), SipManager.SipCallListener {
     private lateinit var statusLabel: TextView
     private lateinit var statusDot: View
     private lateinit var myIdentityText: TextView
+    private lateinit var contactPreviewText: TextView
+    private var rawNumber: String = ""
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         val view = inflater.inflate(R.layout.fragment_dialpad, container, false)
+        com.example.sipcaller.ui.UiMotion.reveal(view)
 
         numberDisplay = view.findViewById(R.id.numberDisplay)
         statusLabel = view.findViewById(R.id.statusLabel)
         statusDot = view.findViewById(R.id.statusDot)
         myIdentityText = view.findViewById(R.id.myIdentityText)
+        contactPreviewText = view.findViewById(R.id.contactPreviewText)
 
         myIdentityText.text = SessionStore.username.ifEmpty { "Not signed in" }
         updateRegistrationUi(SipManager.isAccountRegistered())
@@ -47,18 +51,38 @@ class DialpadFragment : Fragment(), SipManager.SipCallListener {
     }
 
     private fun appendDigit(digit: String) {
-        numberDisplay.text = numberDisplay.text.toString() + digit
+        rawNumber += digit
+        updateNumberUi()
     }
 
     private fun removeLastDigit() {
-        val current = numberDisplay.text.toString()
-        if (current.isNotEmpty()) {
-            numberDisplay.text = current.dropLast(1)
+        if (rawNumber.isNotEmpty()) {
+            rawNumber = rawNumber.dropLast(1)
+            updateNumberUi()
         }
     }
 
+    private fun updateNumberUi() {
+        numberDisplay.text = formatNumber(rawNumber)
+        contactPreviewText.text = when {
+            rawNumber.isEmpty() -> "Enter SIP number"
+            rawNumber.length < 3 -> "Keep typing"
+            else -> {
+                val resolved = runCatching {
+                    ContactStore.findName(requireContext(), rawNumber)
+                }.getOrNull()
+                resolved ?: "Ready to call"
+            }
+        }
+    }
+
+    private fun formatNumber(value: String): String {
+        if (value.length <= 4) return value
+        return value.chunked(3).joinToString(" ")
+    }
+
     private fun onCallClicked() {
-        val destination = numberDisplay.text.toString().trim()
+        val destination = rawNumber.trim()
         if (destination.isEmpty()) {
             Toast.makeText(requireContext(), "নম্বর দিন", Toast.LENGTH_SHORT).show()
             return

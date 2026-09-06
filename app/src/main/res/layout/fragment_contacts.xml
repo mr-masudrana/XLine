@@ -1,47 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="20dp">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Contacts"
-        android:textSize="28sp"
-        android:textStyle="bold" />
-
-    <EditText
-        android:id="@+id/contactsSearch"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginTop="16dp"
-        android:hint="Search contacts"
-        android:inputType="text"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp" />
-
-    <TextView
-        android:id="@+id/contactsEmptyText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        android:gravity="center"
-        android:text="Loading contacts…"
-        android:textSize="16sp" />
-
-    <ScrollView
-        android:id="@+id/contactsScroll"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="10dp"
-        android:layout_weight="1"
-        android:visibility="gone">
-        <LinearLayout
-            android:id="@+id/contactsList"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" />
-    </ScrollView>
+ android:layout_width="match_parent" android:layout_height="match_parent"
+ android:orientation="vertical" android:background="@color/background" android:paddingHorizontal="20dp" android:paddingTop="18dp">
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+  <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Contacts" android:textColor="@color/text_primary" android:textSize="30sp" android:textStyle="bold"/>
+   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="People you can reach quickly" android:textColor="@color/text_secondary" android:textSize="14sp"/>
+  </LinearLayout>
+  <Button android:id="@+id/addContactButton" android:layout_width="52dp" android:layout_height="52dp" android:text="+" android:textSize="24sp" android:textColor="@color/primary" android:background="@drawable/bg_primary_soft_pill" android:contentDescription="Add contact"/>
+ </LinearLayout>
+ <EditText android:id="@+id/contactsSearch" android:layout_width="match_parent" android:layout_height="56dp"
+  android:layout_marginTop="20dp" android:background="@drawable/bg_search_field" android:hint="Search name or number" android:textColor="@color/text_primary" android:textColorHint="@color/text_hint" android:inputType="text" android:paddingHorizontal="18dp"/>
+ <TextView android:id="@+id/contactsEmptyText" android:layout_width="match_parent" android:layout_height="0dp"
+  android:layout_weight="1" android:gravity="center" android:text="Loading contacts…" android:textColor="@color/text_secondary" android:textSize="16sp"
+  android:textAlignment="center" android:lineSpacingExtra="7dp"/>
+ <ScrollView android:id="@+id/contactsScroll" android:layout_width="match_parent" android:layout_height="0dp"
+  android:layout_weight="1" android:visibility="gone">
+  <LinearLayout android:id="@+id/contactsList" android:layout_width="match_parent" android:layout_height="wrap_content"
+   android:orientation="vertical" android:paddingTop="12dp" android:paddingBottom="28dp"/>
+ </ScrollView>
 </LinearLayout>

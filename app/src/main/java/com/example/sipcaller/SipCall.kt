@@ -1,6 +1,8 @@
 package com.example.sipcaller
 
 import android.util.Log
+import com.example.sipcaller.diagnostics.SipCallFlowLogger
+import com.example.sipcaller.diagnostics.SipErrorAnalyzer
 import org.pjsip.pjsua2.*
 
 class SipCall : Call {
@@ -33,7 +35,7 @@ class SipCall : Call {
             val prm = CallOpParam(true)
             prm.statusCode = pjsip_status_code.PJSIP_SC_OK
             answer(prm)
-        }.onFailure { Log.e(TAG, "answer() failed", it) }
+        }.onFailure { Log.e(TAG, "answer() failed", it); com.example.sipcaller.diagnostics.SipFailureReporter.reportException("Answer call", it) }
     }
 
     fun decline() = SipManager.postNative {
@@ -41,7 +43,7 @@ class SipCall : Call {
             val prm = CallOpParam(true)
             prm.statusCode = pjsip_status_code.PJSIP_SC_BUSY_HERE
             hangup(prm)
-        }.onFailure { Log.e(TAG, "decline() failed", it) }
+        }.onFailure { Log.e(TAG, "decline() failed", it); com.example.sipcaller.diagnostics.SipFailureReporter.reportException("Decline call", it) }
     }
 
     fun hangupCall() = SipManager.postNative {
@@ -49,7 +51,7 @@ class SipCall : Call {
             val prm = CallOpParam(true)
             prm.statusCode = pjsip_status_code.PJSIP_SC_DECLINE
             hangup(prm)
-        }.onFailure { Log.e(TAG, "hangupCall() failed", it) }
+        }.onFailure { Log.e(TAG, "hangupCall() failed", it); com.example.sipcaller.diagnostics.SipFailureReporter.reportException("End call", it) }
     }
 
     fun toggleHold() = SipManager.postNative {
@@ -57,12 +59,12 @@ class SipCall : Call {
             val prm = CallOpParam(true)
             if (isOnHold) reinvite(prm) else setHold(prm)
             isOnHold = !isOnHold
-        }.onFailure { Log.e(TAG, "toggleHold() failed", it) }
+        }.onFailure { Log.e(TAG, "toggleHold() failed", it); com.example.sipcaller.diagnostics.SipFailureReporter.reportException("Hold/resume", it) }
     }
 
     fun sendDtmf(digits: String) = SipManager.postNative {
         runCatching { dialDtmf(digits) }
-            .onFailure { Log.e(TAG, "sendDtmf() failed", it) }
+            .onFailure { Log.e(TAG, "sendDtmf() failed", it); com.example.sipcaller.diagnostics.SipFailureReporter.reportException("Send DTMF", it) }
     }
 
     fun durationSeconds(now: Long = System.currentTimeMillis()): Long {
@@ -81,6 +83,12 @@ class SipCall : Call {
                 lastState = mapState(ci.state)
                 lastStatusCode = try { ci.lastStatusCode.swigValue() } catch (_: Throwable) { 0 }
                 lastReason = ci.lastReason ?: ""
+                val callId = try { getId() } catch (_: Throwable) { -1 }
+                SipCallFlowLogger.record(callId, lastState, lastStatusCode, lastReason, remoteUri)
+                if (lastState == STATE_DISCONNECTED && lastStatusCode >= 300) {
+                    SipErrorAnalyzer.log(lastStatusCode, lastReason, callId, remoteUri)
+                    com.example.sipcaller.diagnostics.SipFailureReporter.reportSip(lastStatusCode, lastReason)
+                }
 
                 if (lastState == STATE_CONFIRMED && connectedAt == 0L) {
                     connectedAt = System.currentTimeMillis()

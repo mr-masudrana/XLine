@@ -3,9 +3,13 @@
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary_dark</item>
         <item name="colorAccent">@color/primary</item>
+        <item name="android:fontFamily">sans</item>
         <item name="android:windowBackground">@color/background</item>
-        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/surface</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
     </style>
 
     <style name="DialRow">
@@ -16,14 +20,20 @@
 
     <style name="DialKey">
         <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_height">60dp</item>
         <item name="android:layout_weight">1</item>
-        <item name="android:layout_margin">6dp</item>
+        <item name="android:layout_margin">5dp</item>
         <item name="android:gravity">center</item>
-        <item name="android:textSize">26sp</item>
+        <item name="android:textSize">25sp</item>
+        <item name="android:textStyle">bold</item>
         <item name="android:textColor">@color/text_primary</item>
         <item name="android:background">@drawable/bg_dialpad_key</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
+    </style>
+
+    <style name="AppSectionTitle">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textStyle">bold</item>
     </style>
 </resources>

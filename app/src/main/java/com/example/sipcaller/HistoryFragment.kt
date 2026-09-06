@@ -16,13 +16,13 @@ class HistoryFragment : Fragment() {
     private lateinit var scroll: ScrollView
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val view = inflater.inflate(R.layout.fragment_history, container, false)
+        val view = inflater.inflate(R.layout.fragment_history, container, false) 
+        com.example.sipcaller.ui.UiMotion.reveal(view)
         list = view.findViewById(R.id.historyList)
         empty = view.findViewById(R.id.historyEmptyText)
         scroll = view.findViewById(R.id.historyScroll)
         view.findViewById<Button>(R.id.clearHistoryButton).setOnClickListener {
-            CallHistoryStore.clear(requireContext())
-            render()
+            android.app.AlertDialog.Builder(requireContext()).setTitle("Clear call history?").setMessage("This will remove all recent calls from this device.").setNegativeButton("Cancel", null).setPositiveButton("Clear") { _, _ -> CallHistoryStore.clear(requireContext()); render() }.show()
         }
         render()
         return view
@@ -59,8 +59,10 @@ class HistoryFragment : Fragment() {
             setBackgroundResource(android.R.drawable.list_selector_background)
         }
         val name = ContactRepository(requireContext()).resolveDisplayName(item.number)
-        val directionLabel = when (item.direction) {
-            "Incoming" -> "↓ Incoming"
+        val missed = item.direction.equals("Incoming", true) && (item.result.contains("missed", true) || item.result.contains("failed", true) || item.result.contains("declined", true))
+        val directionLabel = when {
+            missed -> "☎ Missed"
+            item.direction.equals("Incoming", true) -> "↓ Incoming"
             else -> "↑ Outgoing"
         }
         val result = item.result.ifBlank { "Unknown" }
@@ -70,7 +72,13 @@ class HistoryFragment : Fragment() {
         row.addView(TextView(requireContext()).apply { text = name; textSize = 18f; setTypeface(null, android.graphics.Typeface.BOLD) })
         row.addView(TextView(requireContext()).apply { text = item.number; textSize = 14f })
         row.addView(TextView(requireContext()).apply { text = "$directionLabel • $result$duration • $time"; textSize = 13f })
-        row.setOnClickListener { call(item.number) }
+        row.setOnClickListener {
+            android.app.AlertDialog.Builder(requireContext()).setTitle(name)
+                .setMessage("$directionLabel\n${item.number}\n${DateFormat.format("MMM d, yyyy h:mm a", Date(item.timestamp))}\nDuration: ${if (item.durationSeconds > 0) formatDuration(item.durationSeconds) else "No duration"}")
+                .setPositiveButton("Call") { _, _ -> call(item.number) }
+                .setNegativeButton("Delete") { _, _ -> CallHistoryStore.delete(requireContext(), item); render() }
+                .setNeutralButton("Close", null).show()
+        }
         row.setOnLongClickListener {
             android.app.AlertDialog.Builder(requireContext())
                 .setTitle(name)

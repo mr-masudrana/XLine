@@ -16,6 +16,7 @@ object SipManager {
     fun addListener(listener: SipCallListener) = SipEventDispatcher.add(listener)
     fun removeListener(listener: SipCallListener) = SipEventDispatcher.remove(listener)
     fun isAccountRegistered() = SipAccountManager.isRegistered()
+    fun registrationSnapshot() = com.example.sipcaller.diagnostics.SipRegistrationMonitor.snapshot()
     fun currentCall() = SipCallManager.currentCall()
     fun init() = SipEngine.start()
     fun registerAccount(creds: SipCredentials) = SipAccountManager.register(creds)
